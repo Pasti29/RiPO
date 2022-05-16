@@ -1,16 +1,14 @@
 # importing required libraries
+from PyQt5.QtWidgets import *
+from PyQt5.QtMultimedia import *
+from PyQt5.QtMultimediaWidgets import *
 import os
 import sys
 import time
-
-from PyQt5.QtMultimedia import QCamera, QCameraImageCapture, QCameraInfo
-from PyQt5.QtMultimediaWidgets import QCameraViewfinder
-from PyQt5.QtWidgets import (QAction, QApplication, QComboBox, QErrorMessage,
-                             QMainWindow, QStatusBar, QToolBar)
+import cv2
+import numpy as np
 
 # Main window class
-
-
 class MainWindow(QMainWindow):
 
     # constructor
@@ -18,11 +16,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         # setting geometry
-        self.setGeometry(100, 100,
-                         800, 600)
+        self.setGeometry(100, 100, 800, 0)
 
         # setting style sheet
-        self.setStyleSheet("background : lightgrey;")
 
         # getting available cameras
         self.available_cameras = QCameraInfo.availableCameras()
@@ -36,13 +32,11 @@ class MainWindow(QMainWindow):
         self.status = QStatusBar()
 
         # setting style sheet to the status bar
-        self.status.setStyleSheet("background : white;")
 
         # adding status bar to the main window
         self.setStatusBar(self.status)
 
         # path to save
-        self.save_path = ""
 
         # creating a QCameraViewfinder object
         self.viewfinder = QCameraViewfinder()
@@ -62,18 +56,6 @@ class MainWindow(QMainWindow):
         # adding tool bar to main window
         self.addToolBar(toolbar)
 
-        # creating a photo action to take photo
-        click_action = QAction("Click photo", self)
-
-        # adding status tip to the photo action
-        click_action.setStatusTip("This will capture picture")
-
-        # adding tool tip
-        click_action.setToolTip("Capture picture")
-
-        # adding this to the tool bar
-        toolbar.addAction(click_action)
-
         # creating a combo box for selecting camera
         camera_selector = QComboBox()
 
@@ -85,8 +67,9 @@ class MainWindow(QMainWindow):
         camera_selector.setToolTipDuration(2500)
 
         # adding items to the combo box
-        camera_selector.addItems([camera.description()
-                                  for camera in self.available_cameras])
+        camera_selector.addItems(
+            [camera.description() for camera in self.available_cameras]
+        )
 
         # adding action to the combo box
         # calling the select camera method
@@ -99,47 +82,15 @@ class MainWindow(QMainWindow):
         toolbar.setStyleSheet("background : white;")
 
         # setting window title
-        self.setWindowTitle("PyQt5 Cam")
+        self.setWindowTitle("Wybierz kamerę")
 
         # showing the main window
         self.show()
 
     # method to select camera
     def select_camera(self, i):
-
-        # getting the selected camera
-        self.camera = QCamera(self.available_cameras[i])
-
-        # setting view finder to the camera
-        self.camera.setViewfinder(self.viewfinder)
-
-        # setting capture mode to the camera
-        self.camera.setCaptureMode(QCamera.CaptureStillImage)
-
-        # if any error occur show the alert
-        self.camera.error.connect(
-            lambda: self.alert(self.camera.errorString()))
-
-        # start the camera
-        self.camera.start()
-
-        # creating a QCameraImageCapture object
-        self.capture = QCameraImageCapture(self.camera)
-
-        # showing alert if error occur
-        self.capture.error.connect(lambda error_msg, error,
-                                   msg: self.alert(msg))
-
-        # when image captured showing message
-        self.capture.imageCaptured.connect(lambda d,
-                                           i: self.status.showMessage("Image captured : "
-                                                                      + str(self.save_seq)))
-
-        # getting current camera name
-        self.current_camera_name = self.available_cameras[i].description()
-
-        # initial save sequence
-        self.save_seq = 0
+        self.run_main_window(i)
+        pass
 
     # method for alerts
     def alert(self, msg):
@@ -149,6 +100,39 @@ class MainWindow(QMainWindow):
 
         # setting text to the error message
         error.showMessage(msg)
+
+    def process_frame(self, frame):
+        print(frame.shape)
+        for i in range(0, frame.shape[0]):
+            frame[i][0][2] = 255
+            frame[i][0][1] = 0
+            frame[i][0][0] = 0
+        for i in range(0, frame.shape[1]):
+            frame[0][i][2] = 255
+            frame[0][i][1] = 0
+            frame[0][i][0] = 0
+        for i in range(0, frame.shape[0]):
+            frame[i][frame.shape[1] - 1][2] = 255
+            frame[i][frame.shape[1] - 1][1] = 0
+            frame[i][frame.shape[1] - 1][0] = 0
+        for i in range(0, frame.shape[1]):
+            frame[frame.shape[0] - 1][i][2] = 255
+            frame[frame.shape[0] - 1][i][1] = 0
+            frame[frame.shape[0] - 1][i][0] = 0
+        return frame
+
+    def run_main_window(self, i):
+        vid = cv2.VideoCapture(i)
+        while True:
+            ret, frame = vid.read()
+            frame = self.process_frame(frame)
+            cv2.imshow("frame", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+
+        vid.release()
+        cv2.destroyAllWindows()
 
 
 # Driver code
